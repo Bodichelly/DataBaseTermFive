@@ -1,7 +1,11 @@
-import pool from "./pgConnectionModule.js";
 import readlineSync from "readline-sync";
 import { v4 as uuidv4 } from "uuid";
-import { strict } from "assert";
+import carsController from "./controllers/carsController";
+import casesController from "./controllers/carsController";
+import departmentController from "./controllers/carsController";
+import employeeCarController from "./controllers/carsController";
+import employeesController from "./controllers/carsController";
+import offendersController from "./controllers/carsController";
 
 const cars = [
   { column: "car_id", type: "num" },
@@ -114,12 +118,17 @@ export const getData = async () => {
   if (table.length == 0) {
     return;
   }
-  let query = `SELECT * FROM public.${table} `;
-  query += setAdditionalQueryOptitions(query);
-  // console.log(query);
+  let controller = carsController;
+  switch (table) {
+    "offenders": controller = offendersController;
+    "cases": controller =casesController;
+    "departments": controller =departmentController;
+    "employee_car": controller = employeeCarController;
+    "employees": controller = employeesController;
+  }
 
   try {
-    const data = await pool.query(query);
+    const data = await controller.onGet();
     await watchData(table ,data.rows);
     console.log("\n\n");
   } catch (e) {
@@ -207,15 +216,19 @@ export const insertData = async () => {
   if (table.length == 0) {
     return;
   }
-  let query = `INSERT INTO public.${table} `;
-  console.log(table);
-  const columnValues = getColumnValues(table);
 
-  query += " VALUES ";
-  query += joinInScopes(table, columnValues);
+  const columnValues = getColumnValues(table);
+  let controller = carsController;
+  switch (table) {
+    "offenders": controller = offendersController;
+    "cases": controller =casesController;
+    "departments": controller =departmentController;
+    "employee_car": controller = employeeCarController;
+    "employees": controller = employeesController;
+  }
   
   try {
-    await pool.query(query);
+    await controller.onInsert(columnValues);
     console.log("\n\nSuccess!\n\n");
   } catch (e) {
     console.log(e.message);
@@ -256,19 +269,18 @@ const getValueType = (tableName, property) => {
     }
 }
 export const updateData = async (tableName:string, id, value, propertyName) => {
-  let query = `UPDATE public.${tableName} `;
-  
-  
-  if(getValueType(tableName, propertyName)=="num"){
-    query += ` SET ${propertyName} = ${value}`;
-  }else{
-    query += ` SET ${propertyName} = '${value}'`;
-  }
-  query += ` WHERE ${getKeyValue(tableName)} = ${id}`;
  
-console.log(query);
+  let controller = carsController;
+  switch (tableName) {
+    "offenders": controller = offendersController;
+    "cases": controller =casesController;
+    "departments": controller =departmentController;
+    "employee_car": controller = employeeCarController;
+    "employees": controller = employeesController;
+  }
+
   try {
-    await pool.query(query);
+    await controller.onUpdate(id, {value, propertyName});
     console.log("\n\nSuccess!\n\n");
   } catch (e) {
     console.log(e.message);
@@ -297,11 +309,18 @@ const joinWithComma = (table: string, values: string[]): string => {
 
 export const deleteData = async (tableName, id) => {
  
-  const query = `DELETE FROM public.${tableName} WHERE ${getKeyValue(tableName)} = ${id}`;
-
+  //const query = `DELETE FROM public.${tableName} WHERE ${getKeyValue(tableName)} = ${id}`;
+  let controller = carsController;
+  switch (tableName) {
+    "offenders": controller = offendersController;
+    "cases": controller =casesController;
+    "departments": controller =departmentController;
+    "employee_car": controller = employeeCarController;
+    "employees": controller = employeesController;
+  }
 
   try {
-    await pool.query(query);
+    await controller.onDelete(id);
     console.log("\n\nSuccess!\n\n");
   } catch (e) {
     console.log(e.message);
@@ -309,84 +328,14 @@ export const deleteData = async (tableName, id) => {
   }
 };
 export const deleteCarsFromRange = async ()=>{
-    let query = "DELETE FROM public.cars WHERE car_id BETWEEN "
-    console.log(query);
     const from: number = readlineSync.questionInt("Write starting range: ");
-    query += from +" AND ";
-    console.clear();
-    console.log(query);
     const to: number = readlineSync.questionInt("Write ending range: ");
-    query += to + ";"
-    console.log(query);
     try {
-        await pool.query(query);
+        await carsController.onDelete(from, to);
         console.log("\n\nSuccess!\n\n");
       } catch (e) {
         console.log(e.message);
         console.log("\n\n");
       }
 }
-export const enterCustomQuery = async ()=>{
-    const query: string = readlineSync.question("Write custom query: \n");
-    try {
-        const data = await pool.query(query);
-        console.log(data);
-        console.log("\n\nSuccess!\n\n");
-      } catch (e) {
-        console.log(e.message);
-        console.log("\n\n");
-      }
-}
-export const createRandomCars = async () => {
-    console.log("\n--- Executet query ---\n");
-    console.log("CREATE OR REPLACE FUNCTION randomCars()");
-    console.log("   RETURNS void AS $$");
-    console.log("DECLARE");
-    console.log("   step integer  := 0;");
-    console.log("   id integer := random() * (700 - 1) + 1;");
-    console.log("BEGIN");
-    console.log("   LOOP EXIT WHEN step > 10;");
-    console.log("       INSERT INTO public.cars (car_id, licence_plate, vin_code, department_id)");
-    console.log("       VALUES (");
-    console.log("           (id + step)::integer,");
-    console.log("           substring(md5(random()::text), 1, 10),");
-    console.log("           substring(md5(random()::text), 1, 10),");
-    console.log("           (random() * (3 - 1) + 1)::integer");
-    console.log("       );");
-    console.log("       step := step + 1;");
-    console.log("   END LOOP ;");
-    console.log("END;");
-    console.log("$$ LANGUAGE PLPGSQL;");
-    console.log("SELECT randomCars();");
-  const query = `CREATE OR REPLACE FUNCTION randomCars()
-    RETURNS void AS $$
-DECLARE
-    step integer  := 0;
-    id integer := random() * (700 - 1) + 1;
-BEGIN
-    LOOP EXIT WHEN step > 10;
-        INSERT INTO public.cars (car_id, licence_plate, vin_code, department_id)
-        VALUES (
-            (id + step)::integer,
-            substring(md5(random()::text), 1, 10),
-            substring(md5(random()::text), 1, 15),
-            (random() * (3 - 1) + 1)::integer
-        );
-        step := step + 1;
-    END LOOP ;
-END;
-$$ LANGUAGE PLPGSQL;
-SELECT randomCars();`;
-  try {
-    await pool.query(query);
-    console.log("\n\nSuccess!\n\n");
-  } catch (e) {
-    console.log(e.message);
-    console.log("\n\n");
-  }
-};
 
-// export {getData}
-// export {insertData}
-// export {updateData}
-// export {deleteData}
